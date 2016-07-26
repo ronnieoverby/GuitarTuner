@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace GuitarTuner
 {
@@ -8,35 +9,38 @@ namespace GuitarTuner
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Press any key to advance to the next string.\r\n");
+            Console.WriteLine("Use array keys to change strings.\r\n");
 
-            var guitar = new GuitarDisplay(Console.CursorLeft, Console.CursorTop);
+            var guitar = new GuitarDisplay(Console.CursorLeft, Console.CursorTop)
+            {
+                HotString = 6
+            };
             var frequencies = new[] { 84, 110, 147, 196, 247, 330 }; // approx :(
 
-            for (guitar.HotString = 6; guitar.HotString >= 1; guitar.HotString--)
+            while (true)
             {
-                using (var stop = new ManualResetEventSlim())
+                var freq = frequencies[6 - guitar.HotString];
+                var thread = new Thread(() => Console.Beep(freq, int.MaxValue));
+                thread.Start();
+
+                switch (Console.ReadKey().Key)
                 {
-                    var freq = frequencies[6 - guitar.HotString];
-                    Pluck(freq, stop);
-                    Console.ReadKey();
-                    stop.Set();
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.LeftArrow:
+                        guitar.HotString++;
+                        break;
+                    case ConsoleKey.RightArrow:
+                    case ConsoleKey.DownArrow:
+                    default:
+                        guitar.HotString--;
+                        break;
                 }
+
+                thread.Abort();
             }
 
-            Console.ReadKey();
         }
 
-        private static Task Pluck(int freq, ManualResetEventSlim stop)
-        {
-            return Task.Run(() =>
-            {
-                while (!stop.Wait(0))
-                {
-                    Console.Beep(freq, 1000);
-                }
-            });
-        }
     }
 
     class GuitarDisplay
@@ -51,8 +55,12 @@ namespace GuitarTuner
             get { return _hotString; }
             set
             {
-                _hotString = value;
-                ReDraw();
+                if (value >= 1 && value <= 6)
+                {
+                    _hotString = value;
+                    ReDraw();
+
+                }
             }
         }
 
@@ -75,26 +83,73 @@ namespace GuitarTuner
 
         private void Draw()
         {
-            const string indent = "  ";
-            const int strings = 6;
-            Console.WriteLine(indent + "EADGBe");
-            Console.WriteLine(indent + new string('=', strings));
-            for (int fret = 0; fret < 5; fret++)
+            const string guitar = @"  ╔═╤═╤═╤═╤═╤═╤═╗
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │*│ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │*│ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │*│ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │*│ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │*│ │ │ │*│ ║
+  ║─┼─┼─┼─┼─┼─┼─║
+  ║ │ │ │ │ │ │ ║";
+
+            var dict = new Dictionary<int, int>
             {
-                Console.Write(indent);
-                for (int i = 6; i > 0; i--)
+                [6] = 5,
+                [5] = 7,
+                [4] = 9,
+                [3] = 11,
+                [2] = 13,
+                [1] = 15,
+            };
+
+            int h;
+            if (!dict.TryGetValue(HotString, out h))
+                h = -1;
+
+            using (var reader = new StringReader(guitar))
+            {
+                foreach (var line in ReadLines(reader))
                 {
-                    var color = Console.ForegroundColor;
+                    var n = 0;
+                    foreach (var c in line)
+                    {
+                        n++;
 
-                    if (HotString == i)
-                        Console.ForegroundColor = ConsoleColor.Red;
+                        var color = Console.ForegroundColor;
+                        if (n == h)
+                            Console.ForegroundColor = ConsoleColor.Red;
 
-                    Console.Write("|");
-                    Console.ForegroundColor = color;
+                        Console.Write(c);
+                        Console.ForegroundColor = color;
 
+                    }
+
+                    Console.WriteLine();
                 }
-                Console.WriteLine();
             }
+        }
+
+        IEnumerable<string> ReadLines(TextReader reader)
+        {
+            string line;
+            while ((line = reader.ReadLine()) != null)
+                yield return line;
         }
     }
 }
